@@ -11,7 +11,6 @@
         private static Dictionary<string, Action<string>> Actions =
             new Dictionary<string, Action<string>>()
             {
-                ["show-contexts"] = ShowContexts,
                 ["show-orphans"] = ShowOrphans,
                 ["show-duplicates"] = ShowDuplicates,
                 ["remove-orphans"] = RemoveOrphans,
@@ -113,7 +112,7 @@
 
             foreach (var duplicate in duplicates)
             {
-                Console.WriteLine(string.Join(", ", duplicate.Select(d => d.Parent.Attribute("id").Value)));
+                Console.WriteLine(duplicate.Select(d => d.Parent.Attribute("id").Value).Join(", "));
                 Console.WriteLine(duplicate.Key);
             }
         }
