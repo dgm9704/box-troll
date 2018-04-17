@@ -2,97 +2,108 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using System.Xml.Linq;
 
     class Program
     {
-        private static XNamespace xbrli = "http://www.xbrl.org/2003/instance";
-        private static XNamespace metric = "http://www.eba.europa.eu/xbrl/crr/dict/met";
 
-        private static Dictionary<string, Func<XDocument, XDocument>> Actions =
-            new Dictionary<string, Func<XDocument, XDocument>>()
+        private static XNamespace xbrli = "http://www.xbrl.org/2003/instance";
+
+        private static Dictionary<string, Action<XDocument, TextWriter>> OutputActions =
+            new Dictionary<string, Action<XDocument, TextWriter>>
             {
                 ["show-unused-contexts"] = ShowUnusedContexts,
                 ["show-unused-units"] = ShowUnusedUnits,
                 ["show-duplicate-contexts"] = ShowDuplicateContexts,
                 ["show-duplicate-units"] = ShowDuplicateUnits,
+            };
+
+        private static Dictionary<string, Action<XDocument>> DocumentActions =
+            new Dictionary<string, Action<XDocument>>()
+            {
                 ["remove-unused-contexts"] = RemoveUnusedContexts,
                 ["remove-unused-units"] = RemoveUnusedUnits,
                 ["remove-duplicate-contexts"] = RemoveDuplicateContexts,
                 ["remove-duplicate-units"] = RemoveDuplicateUnits,
             };
 
+        private static Dictionary<string, Action<XDocument, IEnumerable<string>>> DocumentListActions =
+            new Dictionary<string, Action<XDocument, IEnumerable<string>>>()
+            {
+                ["remove-datapoints"] = RemoveDatapoints,
+            };
+
+        private static void RemoveDatapoints(XDocument document, IEnumerable<string> list)
+        {
+            
+        }
+
         static void Main(string[] args)
         {
+            if (args.Length < 2 || args.Any(a => a.Equals("help", StringComparison.OrdinalIgnoreCase)))
+            {
+                Console.WriteLine($"xbrl-tool\navailable actions:\n{OutputActions.Keys.Concat(DocumentActions.Keys).Join("\n")}");
+                return;
+            }
+
             var inputFile = args.Last();
             var document = XDocument.Load(inputFile);
 
-            if (Actions.TryGetValue(args.First(), out var action))
+            if (OutputActions.TryGetValue(args.First(), out var outputAction))
             {
-                var result = action(document);
-                if (result != null)
-                    result.Save($"{inputFile}.clean");
+                outputAction(document, Console.Out);
             }
-            else
+            else if (DocumentActions.TryGetValue(args.First(), out var documentAction))
             {
-                Console.WriteLine($"xbrl-tool\navailable actions:\n{Actions.Keys.Join("\n")}");
+                documentAction(document);
+                document.Save($"{inputFile}.clean");
             }
+            // else if(ListFuncs)
+
         }
 
-        private static XDocument ShowUnusedUnits(XDocument document)
+        private static void ShowUnusedUnits(XDocument document, TextWriter output)
         {
             foreach (var unit in FindUnusedUnits(document))
-                Console.WriteLine(unit.ToString());
-
-            return null;
+                output.WriteLine(unit.ToString());
         }
 
-        private static XDocument RemoveUnusedUnits(XDocument document)
+        private static void RemoveUnusedUnits(XDocument document)
         {
             FindUnusedUnits(document).Remove();
-            return document;
         }
 
         private static IEnumerable<XElement> FindUnusedUnits(XDocument document)
         {
             var used = FindUsedUnitIds(document);
 
-            return document.Root.
-                Elements(xbrli + "unit").
+            return document.
+                Units().
                 Where(u => !used.Contains(u.Id()));
         }
 
         private static HashSet<string> FindUsedUnitIds(XDocument document)
-        => document.Root.
-            Elements().
-            Where(e => e.Name.Namespace == metric).
+        => document.
+            Metrics().
             Select(e => e.Attribute("unitRef")?.Value).
             Where(id => !id.IsNullOrEmpty()).
             ToHashSet();
 
-        private static XDocument ShowDuplicateContexts(XDocument document)
+        private static void ShowDuplicateContexts(XDocument document, TextWriter output)
         {
-            var duplicates = FindDuplicateContexts(document);
-
-            foreach (var duplicate in duplicates)
-            {
-                Console.WriteLine(duplicate.Select(d => d.Id()).Join(", "));
-                Console.WriteLine(duplicate.Key);
-            }
-
-            return document;
+            foreach (var duplicate in FindDuplicateContexts(document))
+                output.WriteLine($"{duplicate.Select(d => d.Id()).Join(", ")}\t{duplicate.Key}");
         }
 
-        private static XDocument ShowDuplicateUnits(XDocument document)
+        private static void ShowDuplicateUnits(XDocument document, TextWriter output)
         {
             foreach (var duplicate in FindDuplicateUnits(document))
-                Console.WriteLine(duplicate.Key);
-
-            return null;
+                output.WriteLine(duplicate.Key);
         }
 
-        private static XDocument RemoveDuplicateUnits(XDocument document)
+        private static void RemoveDuplicateUnits(XDocument document)
         {
             var duplicates = FindDuplicateUnits(document);
 
@@ -107,36 +118,31 @@
                     d.Remove();
                 }
             }
-
-            return document;
         }
 
         private static IEnumerable<IGrouping<string, XElement>> FindDuplicateUnits(XDocument document)
-        => document.Root.
-            Elements(xbrli + "unit").
+        => document.
+            Units().
             GroupBy(u => u.Element(xbrli + "measure")?.Value).
             Where(g => g.Count() > 1);
 
-        private static XDocument ShowUnusedContexts(XDocument document)
+        private static void ShowUnusedContexts(XDocument document, TextWriter output)
         {
             foreach (var context in FindUnusedContexts(document))
-                Console.WriteLine(context.Id());
-
-            return null;
+                output.WriteLine(context.Id());
         }
 
-        private static XDocument RemoveUnusedContexts(XDocument document)
+        private static void RemoveUnusedContexts(XDocument document)
         {
             FindUnusedContexts(document).Remove();
-            return document;
         }
 
         private static IEnumerable<XElement> FindUnusedContexts(XDocument document)
         => FindUnusedContexts(document, FindUsedContextIds(document));
 
         private static IEnumerable<XElement> FindUnusedContexts(XDocument document, HashSet<string> usedContextIds)
-        => document.Root.
-            Elements(xbrli + "context").
+        => document.
+            Contexts().
             Where(c => !usedContextIds.Contains(c.Id()));
 
         private static HashSet<string> FindUsedContextIds(XDocument document)
@@ -146,10 +152,10 @@
             Where(r => !r.IsNullOrEmpty()).
             ToHashSet();
 
-        private static XDocument RemoveDuplicateContexts(XDocument document)
+        private static void RemoveDuplicateContexts(XDocument document)
         => RemoveDuplicateContexts(document, FindDuplicateContexts(document));
 
-        private static XDocument RemoveDuplicateContexts(XDocument document, IEnumerable<IGrouping<string, XElement>> duplicates)
+        private static void RemoveDuplicateContexts(XDocument document, IEnumerable<IGrouping<string, XElement>> duplicates)
         {
             foreach (var duplicate in duplicates)
             {
@@ -161,26 +167,24 @@
                     d.Remove();
                 }
             }
-
-            return document;
         }
 
         private static IEnumerable<IGrouping<string, XElement>> FindDuplicateContexts(XDocument document)
-        => document.Root.
-            Elements(xbrli + "context").
+        => document.
+            Contexts().
             GroupBy(s => GetScenarioComparisonValue(s.Element(xbrli + "scenario"))).
             Where(g => g.Count() > 1);
 
         private static string GetScenarioComparisonValue(XElement element)
-            => element == null
-                ? string.Empty
-                : element.
-                    Elements().
-                    OrderBy(e => e.Attribute("dimension").Value).
-                    Select(e => MemberComparisonValue(e)).
-                    Join(",");
+        => element == null
+            ? string.Empty
+            : element.
+                Elements().
+                OrderBy(e => e.Attribute("dimension").Value).
+                Select(e => MemberComparisonValue(e)).
+                Join(",");
 
         private static string MemberComparisonValue(XElement e)
-            => $"{e.Attribute("dimension").Value.Split(':').Last()}={e.Value}";
+        => $"{e.Attribute("dimension").Value.Split(':').Last()}={e.Value}";
     }
 }

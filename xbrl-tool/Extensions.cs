@@ -6,6 +6,9 @@ namespace XbrlTool
 
     public static class Extensions
     {
+        private static XNamespace xbrli = "http://www.xbrl.org/2003/instance";
+        private static XNamespace metric = "http://www.eba.europa.eu/xbrl/crr/dict/met";
+
         public static string Join(this IEnumerable<string> values, string separator)
         => string.Join(separator, values);
 
@@ -24,5 +27,18 @@ namespace XbrlTool
         => document.Root.
             Elements().
             Where(e => e.Context() == contextId);
+
+        public static IEnumerable<XElement> Metrics(this XDocument document)
+        => document.Root.
+            Elements().
+            Where(e => e.Name.Namespace == metric);
+
+        public static IEnumerable<XElement> Units(this XDocument document)
+        => document.Root.
+            Elements(xbrli + "unit");
+
+        public static IEnumerable<XElement> Contexts(this XDocument document)
+        => document.Root.
+            Elements(xbrli + "context");
     }
 }
