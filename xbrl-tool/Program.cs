@@ -37,7 +37,12 @@
 
         private static void RemoveDatapoints(XDocument document, IEnumerable<string> list)
         {
-            
+            var remove = list.ToHashSet();
+
+            document.
+                Metrics().
+                Where(m => remove.Contains($"{m.Name.LocalName} {m.Context()}")).
+                Remove();
         }
 
         static void Main(string[] args)
@@ -48,19 +53,25 @@
                 return;
             }
 
-            var inputFile = args.Last();
+            var action = args.First();
+            var inputFile = args.Skip(1).First();
             var document = XDocument.Load(inputFile);
 
-            if (OutputActions.TryGetValue(args.First(), out var outputAction))
+            if (OutputActions.TryGetValue(action, out var outputAction))
             {
                 outputAction(document, Console.Out);
             }
-            else if (DocumentActions.TryGetValue(args.First(), out var documentAction))
+            else if (DocumentActions.TryGetValue(action, out var documentAction))
             {
                 documentAction(document);
                 document.Save($"{inputFile}.clean");
             }
-            // else if(ListFuncs)
+            else if (DocumentListActions.TryGetValue(action, out var listAction))
+            {
+                var list = File.ReadAllLines(args.Skip(2).First());
+                listAction(document, list);
+                document.Save($"{inputFile}.clean");
+            }
 
         }
 
