@@ -32,7 +32,7 @@
         private static Dictionary<string, Action<XDocument, IEnumerable<string>>> DocumentListActions =
             new Dictionary<string, Action<XDocument, IEnumerable<string>>>()
             {
-                ["remove-datapoints"] = RemoveDatapoints,
+                ["remove-list-datapoints"] = RemoveDatapoints,
             };
 
         private static void RemoveDatapoints(XDocument document, IEnumerable<string> list)
@@ -47,15 +47,27 @@
 
         static void Main(string[] args)
         {
-            if (args.Length < 2 || args.Any(a => a.Equals("help", StringComparison.OrdinalIgnoreCase)))
+            if (args.Length < 1 || args.Any(a => a.Equals("help", StringComparison.OrdinalIgnoreCase)))
             {
                 Console.WriteLine($"xbrl-tool\navailable actions:\n{OutputActions.Keys.Concat(DocumentActions.Keys).Join("\n")}");
                 return;
             }
 
             var action = args.First();
-            var inputFile = args.Skip(1).First();
-            var document = XDocument.Load(inputFile);
+            string inputFile = null;
+
+            XDocument document = null;
+
+            if (Console.IsInputRedirected)
+            {
+                inputFile = null;
+                document = XDocument.Load(Console.OpenStandardInput());
+            }
+            else
+            {
+                inputFile = args.Skip(1).First();
+                document = XDocument.Load(inputFile);
+            }
 
             if (OutputActions.TryGetValue(action, out var outputAction))
             {
@@ -64,13 +76,14 @@
             else if (DocumentActions.TryGetValue(action, out var documentAction))
             {
                 documentAction(document);
-                document.Save($"{inputFile}.clean");
+                document.Save(Console.Out);
             }
             else if (DocumentListActions.TryGetValue(action, out var listAction))
             {
-                var list = File.ReadAllLines(args.Skip(2).First());
+                var listFile = inputFile == null ? args.Skip(1).First() : args.Skip(2).First();
+                var list = File.ReadAllLines(listFile);
                 listAction(document, list);
-                document.Save($"{inputFile}.clean");
+                document.Save(Console.Out);
             }
 
         }
