@@ -1,6 +1,7 @@
 namespace XbrlTool
 {
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using System.Xml.Linq;
 
@@ -11,6 +12,9 @@ namespace XbrlTool
 
         public static string Join(this IEnumerable<string> values, string separator)
         => string.Join(separator, values);
+
+        public static void WriteLine(this string value, TextWriter writer)
+        => writer.WriteLine(value);
 
         public static bool IsNullOrEmpty(this string value)
         => string.IsNullOrEmpty(value);

@@ -29,21 +29,17 @@
                 ["remove-duplicate-units"] = RemoveDuplicateUnits,
             };
 
-        private static Dictionary<string, Action<XDocument, IEnumerable<string>>> DocumentListActions =
-            new Dictionary<string, Action<XDocument, IEnumerable<string>>>()
+        private static Dictionary<string, Action<XDocument, HashSet<string>>> DocumentListActions =
+            new Dictionary<string, Action<XDocument, HashSet<string>>>()
             {
                 ["remove-list-datapoints"] = RemoveDatapoints,
             };
 
-        private static void RemoveDatapoints(XDocument document, IEnumerable<string> list)
-        {
-            var remove = list.ToHashSet();
-
-            document.
-                Metrics().
-                Where(m => remove.Contains($"{m.Name.LocalName} {m.Context()}")).
-                Remove();
-        }
+        private static void RemoveDatapoints(XDocument document, HashSet<string> list)
+        => document.
+            Metrics().
+            Where(m => list.Contains($"{m.Name.LocalName} {m.Context()}")).
+            Remove();
 
         static void Main(string[] args)
         {
@@ -81,32 +77,28 @@
             else if (DocumentListActions.TryGetValue(action, out var listAction))
             {
                 var listFile = inputFile == null ? args.Skip(1).First() : args.Skip(2).First();
-                var list = File.ReadAllLines(listFile);
+                var list = File.ReadAllLines(listFile).ToHashSet();
                 listAction(document, list);
                 document.Save(Console.Out);
             }
-
         }
 
         private static void ShowUnusedUnits(XDocument document, TextWriter output)
-        {
-            foreach (var unit in FindUnusedUnits(document))
-                output.WriteLine(unit.ToString());
-        }
+        => FindUnusedUnits(document).
+            Select(u => u.ToString()).
+            Join("\n").
+            WriteLine(output);
 
         private static void RemoveUnusedUnits(XDocument document)
-        {
-            FindUnusedUnits(document).Remove();
-        }
+         => FindUnusedUnits(document).Remove();
 
         private static IEnumerable<XElement> FindUnusedUnits(XDocument document)
-        {
-            var used = FindUsedUnitIds(document);
+        => FindUnusedUnits(document, FindUsedUnitIds(document));
 
-            return document.
-                Units().
-                Where(u => !used.Contains(u.Id()));
-        }
+        private static IEnumerable<XElement> FindUnusedUnits(XDocument document, HashSet<string> used)
+        => document.
+            Units().
+            Where(u => !used.Contains(u.Id()));
 
         private static HashSet<string> FindUsedUnitIds(XDocument document)
         => document.
@@ -116,16 +108,16 @@
             ToHashSet();
 
         private static void ShowDuplicateContexts(XDocument document, TextWriter output)
-        {
-            foreach (var duplicate in FindDuplicateContexts(document))
-                output.WriteLine($"{duplicate.Select(d => d.Id()).Join(", ")}\t{duplicate.Key}");
-        }
+        => FindDuplicateContexts(document).
+            Select(duplicate => $"{duplicate.Select(d => d.Id()).Join(", ")}\t{duplicate.Key}").
+            Join("\n").
+            WriteLine(output);
 
         private static void ShowDuplicateUnits(XDocument document, TextWriter output)
-        {
-            foreach (var duplicate in FindDuplicateUnits(document))
-                output.WriteLine(duplicate.Key);
-        }
+        => FindDuplicateUnits(document).
+            Select(duplicate => duplicate.Key).
+            Join("\n").
+            WriteLine(output);
 
         private static void RemoveDuplicateUnits(XDocument document)
         {
@@ -151,15 +143,14 @@
             Where(g => g.Count() > 1);
 
         private static void ShowUnusedContexts(XDocument document, TextWriter output)
-        {
-            foreach (var context in FindUnusedContexts(document))
-                output.WriteLine(context.Id());
-        }
+        => FindUnusedContexts(document).
+            Select(context => context.Id()).
+            Join("\n").
+            WriteLine(output);
 
         private static void RemoveUnusedContexts(XDocument document)
-        {
-            FindUnusedContexts(document).Remove();
-        }
+        => FindUnusedContexts(document).
+            Remove();
 
         private static IEnumerable<XElement> FindUnusedContexts(XDocument document)
         => FindUnusedContexts(document, FindUsedContextIds(document));
