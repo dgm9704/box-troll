@@ -44,5 +44,8 @@ namespace XbrlTool
         public static IEnumerable<XElement> Contexts(this XDocument document)
         => document.Root.
             Elements(xbrli + "context");
+
+        public static string MemberComparisonValue(this XElement e)
+        => $"{e.Attribute("dimension").Value.Split(':').Last()}={e.Value}";
     }
 }

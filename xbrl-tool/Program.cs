@@ -45,7 +45,7 @@
         {
             if (args.Length < 1 || args.Any(a => a.Equals("help", StringComparison.OrdinalIgnoreCase)))
             {
-                Console.WriteLine($"xbrl-tool\navailable actions:\n{OutputActions.Keys.Concat(DocumentActions.Keys).Join("\n")}");
+                Console.WriteLine($"xbrl-tool\navailable actions:\n{OutputActions.Keys.Concat(DocumentActions.Keys).Concat(DocumentListActions.Keys).Join("\n")}");
                 return;
             }
 
@@ -163,7 +163,7 @@
         private static HashSet<string> FindUsedContextIds(XDocument document)
         => document.Root.
             Descendants().
-            Select(e => e.Attribute("contextRef")?.Value).
+            Select(e => e.Context()).
             Where(r => !r.IsNullOrEmpty()).
             ToHashSet();
 
@@ -196,10 +196,7 @@
             : element.
                 Elements().
                 OrderBy(e => e.Attribute("dimension").Value).
-                Select(e => MemberComparisonValue(e)).
+                Select(e => e.MemberComparisonValue()).
                 Join(",");
-
-        private static string MemberComparisonValue(XElement e)
-        => $"{e.Attribute("dimension").Value.Split(':').Last()}={e.Value}";
     }
 }
