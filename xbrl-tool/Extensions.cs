@@ -47,5 +47,11 @@ namespace XbrlTool
 
         public static string MemberComparisonValue(this XElement e)
         => $"{e.Attribute("dimension").Value.Split(':').Last()}={e.Value}";
+
+        public static void RemoveUnit(this XDocument document, string id)
+        => document.
+            Units().
+            Where(u=>u.Id() == id).
+            Remove();
     }
 }

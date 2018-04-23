@@ -4,6 +4,7 @@
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Text;
     using System.Xml.Linq;
 
     class Program
@@ -65,6 +66,8 @@
                 document = XDocument.Load(inputFile);
             }
 
+            Console.OutputEncoding = Encoding.UTF8;
+
             if (OutputActions.TryGetValue(action, out var outputAction))
             {
                 outputAction(document, Console.Out);
@@ -120,21 +123,27 @@
             WriteLine(output);
 
         private static void RemoveDuplicateUnits(XDocument document)
-        {
-            var duplicates = FindDuplicateUnits(document);
+        => RemoveDuplicateUnits(document, FindDuplicateUnits(document));
 
+        private static void RemoveDuplicateUnits(XDocument document, IEnumerable<IGrouping<string, XElement>> duplicates)
+        {
             foreach (var duplicate in duplicates)
             {
-                var id = duplicate.First().Id();
-                foreach (var d in duplicate.Skip(1))
-                {
-                    var duplicateId = d.Id();
-                    foreach (var f in document.Root.Elements().Where(e => e.Attribute("unitId")?.Value == duplicateId))
-                        f.SetAttributeValue("unitId", id);
-                    d.Remove();
-                }
+                ReplaceUnits(document, duplicate.Skip(1).Select(d => d.Id()), duplicate.First().Id());
             }
         }
+
+        private static void ReplaceUnits(XDocument document, IEnumerable<string> oldIds, string newId)
+        => oldIds.
+            ToList().ForEach(oldId =>
+                ReplaceUnit(document, oldId, newId));
+
+        private static void ReplaceUnit(XDocument document, string oldUnit, string newUnit)
+        => document.Root.
+            Elements().
+            Where(e => e.Attribute("unitId")?.Value == oldUnit).
+            ToList().ForEach(e =>
+                e.SetAttributeValue("unitId", newUnit));
 
         private static IEnumerable<IGrouping<string, XElement>> FindDuplicateUnits(XDocument document)
         => document.
